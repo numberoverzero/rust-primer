@@ -1,0 +1,6 @@
+[package]
+name = "rust-primer"
+version = "0.1.0"
+authors = ["Joe Cross <joe.mcross@gmail.com>"]
+
+[dependencies]
