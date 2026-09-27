@@ -2,5 +2,21 @@
 name = "primer"
 version = "0.1.0"
 authors = ["Joe Cross <joe.mcross@gmail.com>"]
+edition = "2024"
+rust-version = "1.85"
+description = "factor search for u64 integers"
+repository = "https://github.com/numberoverzero/rust-primer"
+publish = false
 
 [dependencies]
+
+[[bin]]
+name = "solve"
+path = "src/main.rs"
+
+[[bench]]
+name = "bits"
+harness = false
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,50 +1,46 @@
-pub trait SwapBits {
-    fn swap_bits(self) -> u64;
+/// Sum `p[j] * q[column-j]` for `j=0..=column`; bit zero is the LSB.
+pub fn diagonal_multiply(p: u64, q: u64, column: u32) -> u32 {
+    assert!(column < u64::BITS, "column must be below 64");
+    (p & (q.reverse_bits() >> (63 - column))).count_ones()
 }
 
-pub trait SetBitPos {
-    fn enable_bit(self, pos: usize) -> u64;
-    fn disable_bit(self, pos: usize) -> u64;
-    fn set_bit(self, pos: usize, enable: u64) -> u64;
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-pub trait KeepLeftBits {
-    fn keep_left(self, pos: usize) -> u64;
-}
-
-impl SwapBits for u64 {
-    fn swap_bits(self) -> u64 {
-        // https://github.com/EugeneGonzalez/bit_reverse/blob\
-        //     /70cc4c4cd28b2e4b1d916d9d1a951e461cadfe8e/src/parallel.rs
-        // Swap odd and even bits
-        let mut v = self;
-        v = ((v >> 1) & (0x5555555555555555u64)) | ((v & (0x5555555555555555u64)) << 1);
-        // Swap consecutive pairs
-        v = ((v >> 2) & (0x3333333333333333u64)) | ((v & (0x3333333333333333u64)) << 2);
-        // Swap nibbles
-        v = ((v >> 4) & (0x0F0F0F0F0F0F0F0Fu64)) | ((v & (0x0F0F0F0F0F0F0F0Fu64)) << 4);
-
-        v.swap_bytes()
+    #[test]
+    fn original_example_and_upper_bits() {
+        assert_eq!(diagonal_multiply(0b011101101, 0b101010110, 7), 3);
+        assert_eq!(diagonal_multiply(1 << 32, 1, 32), 1);
+        assert_eq!(diagonal_multiply(1 << 63, 1, 63), 1);
+        assert_eq!(diagonal_multiply(u64::MAX, u64::MAX, 63), 64);
     }
-}
 
-impl SetBitPos for u64 {
-    fn enable_bit(self, pos: usize) -> u64 { self | (1u64 << pos) }
-    fn disable_bit(self, pos: usize) -> u64 { self & !(1u64 << pos) }
-    fn set_bit(self, pos: usize, enable: u64) -> u64 {
-        // need overflow for -bool -> max val u64
-        // https://graphics.stanford.edu/~seander/\
-        //     bithacks.html#ConditionalSetOrClearBitsWithoutBranching
-        let mask = 1u64 << pos;
-        (self & !mask) | enable << pos
+    #[test]
+    fn matches_direct_long_multiplication() {
+        let mut state = 1234_u64;
+        for _ in 0..1000 {
+            let p = random(&mut state);
+            let q = random(&mut state);
+            for column in 0..64 {
+                let expected = (0..=column)
+                    .map(|j| ((p >> j) & 1) * ((q >> (column - j)) & 1))
+                    .sum::<u64>();
+                assert_eq!(u64::from(diagonal_multiply(p, q, column)), expected);
+            }
+        }
     }
-}
 
-impl KeepLeftBits for u64 {
-    fn keep_left(self, pos: usize) -> u64 { self >> (63 - pos) }
-}
+    fn random(state: &mut u64) -> u64 {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        *state
+    }
 
-pub fn diagonal_multiply(p: u64, q: u64, pos: usize) -> u8 {
-    let x = q.swap_bits().keep_left(pos);
-    (p & x).count_ones() as u8
+    #[test]
+    #[should_panic(expected = "column must be below 64")]
+    fn rejects_an_invalid_column() {
+        diagonal_multiply(1, 1, 64);
+    }
 }
